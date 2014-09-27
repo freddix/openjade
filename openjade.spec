@@ -1,16 +1,19 @@
+# based on PLD Linux spec git://git.pld-linux.org/packages/.git
 %define		pre	1
 
 Summary:	DSSSL parser
 Name:		openjade
 Version:	1.3.3
-Release:	0.pre%{pre}.12
+Release:	0.pre%{pre}.13
 Epoch:		1
 License:	Free (Copyright (C) 1999 The OpenJade group)
 Group:		Applications/Publishing/SGML
 Source0:	http://downloads.sourceforge.net/openjade/%{name}-%{version}-pre%{pre}.tar.gz
 # Source0-md5:	cbf3d8be3e3516dcb12b751de822b48c
 Patch0:		%{name}-nls-from-1.4.patch
-Patch1:		%{name}-libs.patch
+Patch1:		%{name}-msggen.pl.patch
+Patch2:		%{name}-linking.patch
+Patch3:		%{name}-as-needed.patch
 URL:		http://openjade.sourceforge.net/
 BuildRequires:	autoconf
 BuildRequires:	automake
@@ -28,9 +31,6 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 %define		sgmldir		/usr/share/sgml
 %define		_datadir	%{sgmldir}/%{name}-%{version}
 
-# FIXME: all libraries underlinked
-%define		skip_post_check_so	lib.*\.so.*
-
 %description
 Jade (James' DSSSL Engine) is an implementation of the DSSSL style
 language. OpenJade is successor of Jade.
@@ -47,17 +47,18 @@ Openjade header files.
 %setup -q -n %{name}-%{version}-pre%{pre}
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
+%patch3 -p1
 
-sed -i 's|iostream.h|iostream|g' style/MultiLineInlineNote.cxx
+%{__sed} -i 's|iostream.h|iostream|g' style/MultiLineInlineNote.cxx
 
 %build
-LDFLAGS=""; export LDFLAGS
 ln -sf config/configure.in .
 # smr_SWITCH and OJ_SIZE_T_IS_UINT
 tail -n +3349 config/aclocal.m4 | head -n 64 > acinclude.m4
 %{__gettextize}
 %{__libtoolize}
-%{__aclocal}
+%{__aclocal} -I config
 %{__autoconf}
 %configure \
 	--disable-static					\
@@ -73,9 +74,11 @@ tail -n +3349 config/aclocal.m4 | head -n 64 > acinclude.m4
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT%{_datadir}
 
-%{__make} install \
+%{__make} -j1 install \
 	DESTDIR=$RPM_BUILD_ROOT \
 	localedir=%{_prefix}/share/locale
+
+%{__rm} $RPM_BUILD_ROOT%{_libdir}/*.la
 
 # simulate jade
 ln -sf openjade $RPM_BUILD_ROOT%{_bindir}/jade
@@ -123,6 +126,5 @@ fi
 %files devel
 %defattr(644,root,root,755)
 %attr(755,root,root) %{_libdir}/lib*.so
-%{_libdir}/lib*.la
 %{_includedir}/OpenJade
 
